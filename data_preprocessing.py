@@ -2,13 +2,14 @@
 import json
 import os
 from sklearn.model_selection import train_test_split
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader,Sampler
 from torchvision import transforms
 from sklearn.preprocessing import OneHotEncoder
 from PIL import Image
 import numpy as np
 import cv2
 import torch
+
 
 
 ''' Session 1 : To store specific vehicle details on a JSON file ... '''
@@ -57,7 +58,7 @@ def load_data(json_file, attribute):
         data = json.load(file)
     return [(img_name, int(attributes[attribute])) for img_name, attributes in data.items()]
 
-# Custom Dataset class
+# Custom Dataset class - Stage 1 
 class ImageDataset(Dataset):
     def __init__(self, data, img_dir, encoder, transform=None):
         self.data = data
@@ -80,6 +81,52 @@ class ImageDataset(Dataset):
         type_one_hot = encoder.transform([[label - 1]]).flatten()  # One-hot encode the label
         return image, torch.tensor(type_one_hot, dtype=torch.float32)
 
+
+class VehicleDataset(Dataset):
+    def __init__(self, label_to_samples, transform=None):
+        self.label_to_samples = label_to_samples
+        self.labels = list(label_to_samples.keys())
+        self.samples = [(label, img_path) for label, img_paths in label_to_samples.items() for img_path in img_paths]
+        self.transform = transform if transform is not None else transforms.ToTensor()
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        label, img_path = self.samples[idx]
+        image = Image.open(img_path).convert('RGB')
+        if self.transform:
+            image = self.transform(image)
+        return image, int(label)
+
+
+
+
+class PKSampler(Sampler):
+    def __init__(self, data_source, p=64, k=16):
+        super().__init__(data_source)
+        self.p = p
+        self.k = k
+        self.data_source = data_source
+
+    def __iter__(self):
+        # Generate batches by selecting `p` vehicle IDs and `k` images per vehicle
+        pk_count = len(self) // (self.p * self.k)
+        for _ in range(pk_count):
+            # Randomly choose `p` unique vehicle IDs
+            labels = np.random.choice(np.arange(len(self.data_source.label_to_samples.keys())), self.p, replace=False)
+            
+            for l in labels:
+                indices = self.data_source.label_to_samples[l]
+                # If less than `k` samples exist for a vehicle, allow replacement
+                replace = len(indices) < self.k
+                for i in np.random.choice(indices, self.k, replace=replace):
+                    yield i
+
+    def __len__(self):
+        pk = self.p * self.k
+        samples = ((len(self.data_source) - 1) // pk + 1) * pk
+        return samples
 
 ''' Session 2 : Load the dataset for stage 1 : Classification - Type '''
 
@@ -179,4 +226,32 @@ def Load_Color_Train_Data():
     
     return train_loader, val_loader, test_loader
 
-Load_Type_Train_Data()
+
+
+
+'''Section 4 : Stage 2 - Data Prep'''
+def get_label_to_samples():
+    #train json path
+    json_path = "/project/shah/shireesh/VehicleREID/train_data.json"
+
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+
+    # Create a dictionary that maps vehicleID to its list of images
+    label_to_samples = {}
+    base_dir = '/home/sporalas/VeRi/image_train/'
+
+    for image_name, info in data.items():
+        vehicle_id = info['vehicleID']
+        image_path = os.path.join(base_dir, image_name)
+        
+        if vehicle_id not in label_to_samples:
+            label_to_samples[vehicle_id] = []
+        
+        label_to_samples[vehicle_id].append(image_path)
+        
+        return label_to_samples
+
+
+
+
