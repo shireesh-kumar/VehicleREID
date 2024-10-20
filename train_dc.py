@@ -55,7 +55,7 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         triplet_loss.backward()
         optimizer.step()
-
+ 
         total_train_loss += triplet_loss
 
     avg_train_loss = total_train_loss / len(train_loader)
