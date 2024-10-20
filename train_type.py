@@ -4,19 +4,16 @@ import torch.nn as nn
 import torchvision.models as models
 
 
-from data_preprocessing import Load_Type_Train_Data
+from data_preprocessing import Load_Type_Train_Data, set_global_seed
 from resnet_model1 import ResNet
 import matplotlib.pyplot as plt
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
 import seaborn as sns
 
 
+'''Important'''
+set_global_seed(42)
 
-# Parameters for ResNet50
-model_parameters = {
-    'resnet50': ([64, 128, 256, 512], [3, 4, 6, 3], 4, True),
-    'resnet34' : ([64, 128, 256, 512 ], [3, 4, 6, 3 ], 1 ,  False)
-}
 
 # Load the data
 try:

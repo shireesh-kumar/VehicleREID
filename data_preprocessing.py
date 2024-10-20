@@ -49,8 +49,28 @@ import torch
 
 
 '''Utility Methods and Classes'''
+def set_global_seed(seed=42):
+    # Python built-in random
+    import random
+    random.seed(seed)
+    
+    # NumPy
+    import numpy as np
+    np.random.seed(seed)
+    
+    # PyTorch
+    import torch
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # If using multiple GPUs
+    
+    # PyTorch Deterministic Behavior (optional)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 
 encoder = OneHotEncoder(sparse_output=False)
+set_global_seed(42)
 
 # Function to load data from a JSON file
 def load_data(json_file, attribute):
@@ -225,8 +245,6 @@ def Load_Color_Train_Data():
     print(f"Number of batches in Test set : {len(test_loader)}\n")
     
     return train_loader, val_loader, test_loader
-
-
 
 
 '''Section 4 : Stage 2 - Data Prep'''

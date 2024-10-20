@@ -4,13 +4,14 @@ import torch.nn as nn
 import torchvision.models as models
 
 
-from data_preprocessing import Load_Color_Train_Data
+from data_preprocessing import Load_Color_Train_Data, set_global_seed
 from resnet_model1 import ResNet
 import matplotlib.pyplot as plt
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
 import seaborn as sns
 
-
+'''Important'''
+set_global_seed(42)
 
 # Load the data
 try:
