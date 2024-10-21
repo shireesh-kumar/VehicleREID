@@ -2,24 +2,38 @@ import torch
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 import matplotlib.pyplot as plt
+from torchvision import transforms
 
 from data_preprocessing import VehicleDataset, get_label_to_samples, PKSampler, set_global_seed
 
 from loss import trihard_loss
-
+from feature_extractor import CustomResNet34
+from dc_module import DCModule
 
 '''Important'''
 set_global_seed(42)
 
+# Check if a GPU is available and set the device accordingly
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
 label_to_samples = get_label_to_samples()
 
-# Create dataset
-dataset = VehicleDataset(label_to_samples, transform=transforms.ToTensor())
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),  # Resize the image to 224x224 (width, height)
+    transforms.ToTensor()           # Convert the image to a tensor
+])
 
+# Create dataset
+dataset = VehicleDataset(label_to_samples, transform=transform)
+print(f"Len of the dataset = {len(dataset)}")
 # Split dataset into training and validation sets
 train_size = int(0.8 * len(dataset))  # 80% training
 val_size = len(dataset) - train_size  # 20% validation
 train_dataset, val_dataset = random_split(dataset, [train_size, val_size]) 
+
+print(len(train_dataset))
+print((len(val_dataset)))
 
 # Create DataLoader for both train and validation sets
 p, k = 64, 16
@@ -29,12 +43,16 @@ val_sampler = PKSampler(val_dataset, p=p, k=k)
 train_loader = DataLoader(train_dataset, batch_size=p * k, sampler=train_sampler)
 val_loader = DataLoader(val_dataset, batch_size=p * k, sampler=val_sampler)
 
-# Model definition and optimizer
-model = ...  
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+# Create an instance of the DCModule
+dc_module = DCModule(window_size=3, step_size=2).to(device)   # Adjust parameters as needed
 
+
+# Model definition and optimizer
+model = CustomResNet34(pretrained=True).to(device) 
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+ 
 # Training loop setup
-num_epochs = 10
+num_epochs = 2
 train_losses = []
 val_losses = []
 
@@ -45,6 +63,10 @@ for epoch in range(num_epochs):
     
     for batch in train_loader:
         images, labels = batch
+        # Move images and labels to the device
+        images = images.to(device)
+        labels = labels.to(device)
+
         embeddings = model(images)  # Forward pass to get embeddings
         
         # Compute triplet loss for each unique vehicle ID
@@ -56,7 +78,7 @@ for epoch in range(num_epochs):
         triplet_loss.backward()
         optimizer.step()
  
-        total_train_loss += triplet_loss
+        total_train_loss += triplet_loss.item()
 
     avg_train_loss = total_train_loss / len(train_loader)
     train_losses.append(avg_train_loss)
@@ -68,11 +90,14 @@ for epoch in range(num_epochs):
     with torch.no_grad():
         for batch in val_loader:
             images, labels = batch
+            # Move images and labels to the device
+            images = images.to(device)
+            labels = labels.to(device)
             embeddings = model(images)
             
             triplet_loss = 0
             triplet_loss += trihard_loss(embeddings, labels, margin=1.0)    
-            total_val_loss += triplet_loss
+            total_val_loss += triplet_loss.item()
     
     avg_val_loss = total_val_loss / len(val_loader)
     val_losses.append(avg_val_loss)

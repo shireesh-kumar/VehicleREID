@@ -258,17 +258,15 @@ def get_label_to_samples():
     # Create a dictionary that maps vehicleID to its list of images
     label_to_samples = {}
     base_dir = '/home/sporalas/VeRi/image_train/'
-
     for image_name, info in data.items():
         vehicle_id = info['vehicleID']
         image_path = os.path.join(base_dir, image_name)
-        
         if vehicle_id not in label_to_samples:
             label_to_samples[vehicle_id] = []
         
         label_to_samples[vehicle_id].append(image_path)
         
-        return label_to_samples
+    return label_to_samples
 
 
 
