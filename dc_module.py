@@ -1,7 +1,5 @@
 import torch
-import torch.nn.functional as F
 import torch.nn as nn
-
 
 class DCModule(nn.Module):
     def __init__(self, window_size=3, step_size=2):
@@ -9,12 +7,14 @@ class DCModule(nn.Module):
         self.window_size = window_size
         self.step_size = step_size
 
-    def forward(self, anchor, positive, negative):
-        refined_positive = self.similarity_pooling(anchor, positive)
-        refined_negative = self.difference_pooling(anchor, negative)
-        return refined_positive, refined_negative
+    def forward(self, anchor, positive, negative):  
+
+        return (
+            self.pool(anchor, positive, min) + self.pool(anchor, positive, max),
+            self.pool(anchor, negative, min) + self.pool(anchor, negative, max)
+        )
     
-    def similarity_pooling(self, anchor, comparison):
+    def pool(self, anchor, comparison, reduction_fn):
         h, w = anchor.shape
         refined_map = comparison.clone()
 
@@ -23,23 +23,7 @@ class DCModule(nn.Module):
                 anchor_patch = anchor[i:i + self.window_size, j:j + self.window_size]
                 comp_patch = comparison[i:i + self.window_size, j:j + self.window_size]
                 diff = torch.abs(anchor_patch - comp_patch)
-                min_diff_idx = torch.argmin(diff.view(-1))
-                selected_pixel = comp_patch.view(-1)[min_diff_idx]
-                refined_map[i:i + self.window_size, j:j + self.window_size] = selected_pixel
-
-        return refined_map
-    
-    def difference_pooling(self, anchor, comparison):
-        h, w = anchor.shape
-        refined_map = comparison.clone()
-
-        for i in range(0, h - self.window_size + 1, self.step_size):
-            for j in range(0, w - self.window_size + 1, self.step_size):
-                anchor_patch = anchor[i:i + self.window_size, j:j + self.window_size]
-                comp_patch = comparison[i:i + self.window_size, j:j + self.window_size]
-                diff = torch.abs(anchor_patch - comp_patch)
-                max_diff_idx = torch.argmax(diff.view(-1))
-                selected_pixel = comp_patch.view(-1)[max_diff_idx]
-                refined_map[i:i + self.window_size, j:j + self.window_size] = selected_pixel
+                selected_pixel_idx = diff.reshape(-1).argmax() if reduction_fn == max else diff.reshape(-1).argmin()
+                refined_map[i:i + self.window_size, j:j + self.window_size] = comp_patch.reshape(-1)[selected_pixel_idx]
 
         return refined_map

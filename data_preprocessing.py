@@ -9,6 +9,7 @@ from PIL import Image
 import numpy as np
 import cv2
 import torch
+import random
 
 
 
@@ -101,53 +102,6 @@ class ImageDataset(Dataset):
         type_one_hot = encoder.transform([[label - 1]]).flatten()  # One-hot encode the label
         return image, torch.tensor(type_one_hot, dtype=torch.float32)
 
-
-class VehicleDataset(Dataset):
-    def __init__(self, label_to_samples, transform=None):
-        self.label_to_samples = label_to_samples
-        self.labels = list(label_to_samples.keys())
-        self.samples = [(label, img_path) for label, img_paths in label_to_samples.items() for img_path in img_paths]
-        self.transform = transform if transform is not None else transforms.ToTensor()
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        label, img_path = self.samples[idx]
-        image = Image.open(img_path).convert('RGB')
-        if self.transform:
-            image = self.transform(image)
-        return image, int(label)
-
-
-
-
-class PKSampler(Sampler):
-    def __init__(self, data_source, p=64, k=16):
-        super().__init__(data_source)
-        self.p = p
-        self.k = k
-        self.data_source = data_source
-
-    def __iter__(self):
-        # Generate batches by selecting `p` vehicle IDs and `k` images per vehicle
-        pk_count = len(self) // (self.p * self.k)
-        for _ in range(pk_count):
-            # Randomly choose `p` unique vehicle IDs
-            labels = np.random.choice(np.arange(len(self.data_source.label_to_samples.keys())), self.p, replace=False)
-            
-            for l in labels:
-                indices = self.data_source.label_to_samples[l]
-                # If less than `k` samples exist for a vehicle, allow replacement
-                replace = len(indices) < self.k
-                for i in np.random.choice(indices, self.k, replace=replace):
-                    yield i
-
-    def __len__(self):
-        pk = self.p * self.k
-        samples = ((len(self.data_source) - 1) // pk + 1) * pk
-        return samples
-
 ''' Session 2 : Load the dataset for stage 1 : Classification - Type '''
 
 def Load_Type_Train_Data():
@@ -189,8 +143,6 @@ def Load_Type_Train_Data():
     print(f"Number of batches in Test set : {len(test_loader)}\n")
     
     return train_loader, val_loader, test_loader
-
-
 
 '''Session 3 : Load the dataset for stage 1 : Classification - Color '''
 
@@ -246,7 +198,6 @@ def Load_Color_Train_Data():
     
     return train_loader, val_loader, test_loader
 
-
 '''Section 4 : Stage 2 - Data Prep'''
 def get_label_to_samples():
     #train json path
@@ -259,7 +210,7 @@ def get_label_to_samples():
     label_to_samples = {}
     base_dir = '/home/sporalas/VeRi/image_train/'
     for image_name, info in data.items():
-        vehicle_id = info['vehicleID']
+        vehicle_id = int(info['vehicleID'])
         image_path = os.path.join(base_dir, image_name)
         if vehicle_id not in label_to_samples:
             label_to_samples[vehicle_id] = []
@@ -268,6 +219,16 @@ def get_label_to_samples():
         
     return label_to_samples
 
+# Split the label_to_samples dictionary into training and validation sets
+def split_label_to_samples(label_to_samples, train_ratio=0.8):
+    labels = list(label_to_samples.keys())
+    random.shuffle(labels)  # Shuffle labels for random split
+    train_size = int(train_ratio * len(labels))
+    train_labels = labels[:train_size]
+    val_labels = labels[train_size:]
 
+    # Create new dictionaries for training and validation
+    train_label_to_samples = {label: label_to_samples[label] for label in train_labels}
+    val_label_to_samples = {label: label_to_samples[label] for label in val_labels}
 
-
+    return train_label_to_samples, val_label_to_samples
