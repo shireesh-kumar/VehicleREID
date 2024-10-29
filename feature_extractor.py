@@ -14,12 +14,9 @@ class CustomResNet18(nn.Module):
         # Add a Conv2d layer to adjust the output channels to 1
         self.conv_adjust = nn.Conv2d(512, 1, kernel_size=1)  # Change number of output channels to 1
         
-        # Add an Upsampling layer to resize to (128, 128)
-        self.upsample = nn.Upsample(size=(128, 128), mode='bilinear', align_corners=False)
+        # Add an Upsampling layer to resize to (64, 64)
+        self.upsample = nn.Upsample(size=(64, 64), mode='bilinear', align_corners=False)
 
-
-        for param in list(self.feature_extractor.children())[:10]:
-            param.requires_grad = False
 
     def forward(self, x):
         # Forward pass through the feature extractor
@@ -38,3 +35,12 @@ class CustomResNet18(nn.Module):
 # input_tensor = torch.randn(64, 3, 224, 224)  # Batch size of 4, 3 channels, 224x224 image
 # output_features = model(input_tensor)
 # print("Output feature map shape:", output_features.shape)  # Should be (4, 1, 128, 128)
+# model = CustomResNet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+
+# # Count total parameters
+# total_params = sum(p.numel() for p in model.parameters())
+# print(f"Total number of parameters: {total_params}")
+
+# # Count only trainable parameters
+# trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+# print(f"Number of trainable parameters: {trainable_params}")

@@ -48,19 +48,17 @@ class RandomIdentitySampler(Sampler):
     - batch_size (int): number of examples in a batch.
     """
 
-    def __init__(self, data_source, batch_size, num_instances):
+    def __init__(self, data_source,labeltosample, batch_size, num_instances):
         self.data_source = data_source.data
         self.batch_size = batch_size
         self.num_instances = num_instances
         self.num_pids_per_batch = self.batch_size // self.num_instances
-        self.index_dic = defaultdict(list) #dict with list value
+        self.index_dic = labeltosample #dict with list value
         #{783: [0, 5, 116, 876, 1554, 2041],...,}
-        for (index, pid) in self.data_source.items():
-            self.index_dic[pid].append(index)
         self.pids = list(self.index_dic.keys())
+        self.length = 0
 
         # estimate number of examples in an epoch
-        self.length = 0
         for pid in self.pids:
             idxs = self.index_dic[pid]
             num = len(idxs)
@@ -68,8 +66,10 @@ class RandomIdentitySampler(Sampler):
                 num = self.num_instances
             self.length += num - num % self.num_instances
 
+
     def __iter__(self):
         batch_idxs_dict = defaultdict(list)
+        self.pids = list(self.index_dic.keys())
 
         for pid in self.pids:
             idxs = copy.deepcopy(self.index_dic[pid])
@@ -82,11 +82,10 @@ class RandomIdentitySampler(Sampler):
                 if len(batch_idxs) == self.num_instances:
                     batch_idxs_dict[pid].append(batch_idxs)
                     batch_idxs = []
-        avai_pids = copy.deepcopy(self.pids)
         final_idxs = []
 
         while len(self.pids) >= self.num_pids_per_batch:
-            # final_idxs = []  # Reset for a new batch
+            final_idxs = []  # Reset for a new batch
             selected_pids = random.sample(self.pids, self.num_pids_per_batch)
             
             for pid in selected_pids:
@@ -96,7 +95,5 @@ class RandomIdentitySampler(Sampler):
                     self.pids.remove(pid)  # Remove PID if no more samples left
             yield from final_idxs  # Use yield to return this batch and continue
         
-        # return iter(final_idxs)
-
     def __len__(self):
         return self.length
