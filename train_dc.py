@@ -12,6 +12,10 @@ from feature_extractor import CustomResNet18
 import torch.nn as nn
 from torchvision.models import  resnet18, ResNet18_Weights
 import torch.distributed as dist  # Importing the distributed module
+import cProfile
+import pstats
+import io
+
 
 
 '''Important'''
@@ -109,19 +113,35 @@ for epoch in range(num_epochs):
         total_train_loss += triplet_loss.item()
         print(f"Batch{count+1} completed for Epoch {epoch+1} ", flush=True)
         count += 1
+        break
+    break
         
 
     avg_train_loss = total_train_loss / len(train_loader)
     train_losses.append(avg_train_loss)
     
     print(f"## Epoch {epoch + 1}: Train Loss: {avg_train_loss} ##")
-    
-# try:
-#     torch.cuda.memory._dump_snapshot(f"track.pickle")
-# except Exception as e:
-#     print(f"Failed to capture memory snapshot {e}")
+        
+    # try:
+    #     torch.cuda.memory._dump_snapshot(f"track.pickle")
+    # except Exception as e:
+    #     print(f"Failed to capture memory snapshot {e}")
 
-# # Stop recording memory snapshot history.
-# torch.cuda.memory._record_memory_history(enabled=None)
+    # # Stop recording memory snapshot history.
+    # torch.cuda.memory._record_memory_history(enabled=None)
 
 
+# # Create a profile object
+# pr = cProfile.Profile()
+# pr.enable()  # Start profiling
+
+# main()  # Run your main function
+
+# pr.disable()  # Stop profiling
+
+# # Create a Stats object and print the stats
+# s = io.StringIO()
+# sortby = pstats.SortKey.CUMULATIVE  # You can change this to other sort options
+# ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+# ps.print_stats()
+# print(s.getvalue())  # Print the profiling results

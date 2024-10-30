@@ -41,10 +41,26 @@ class DCModuleOptimized(nn.Module):
         self.step_size = step_size
 
     def forward(self, anchor, positive,negative):
-        # Obtain both min and max refined maps from anchor-positive and anchor-negative comparisons
-        min_pos, max_pos = self.pool(anchor, positive)
-        min_neg, max_neg = self.pool(anchor, negative)
-        return (min_pos + max_pos), (min_neg+max_neg)
+        if torch.cuda.is_available():
+            # Set up two CUDA streams for parallel computation on GPU
+            stream1 = torch.cuda.Stream()
+            stream2 = torch.cuda.Stream()
+
+            with torch.cuda.stream(stream1):
+                min_pos, max_pos = self.pool(anchor, positive)
+            with torch.cuda.stream(stream2):
+                min_neg, max_neg = self.pool(anchor, negative)
+
+            # Ensure both streams are complete before proceeding
+            torch.cuda.synchronize()
+
+        else:
+            # Fallback to sequential computation if CUDA is not available
+            min_pos, max_pos = self.pool(anchor, positive)
+            min_neg, max_neg = self.pool(anchor, negative)
+
+        return (min_pos + max_pos), (min_neg + max_neg)
+
 
     def pool(self, anchor, comparison):
         
