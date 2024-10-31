@@ -47,39 +47,30 @@ class TripletLoss(nn.Module):
         # dist_ap, dist_an = [], []
         hard_positive_images, hard_negative_images = [], []
 
+        # for i in range(n):
+        #     # Hardest positive
+        #     hard_pos_indices = mask[i].nonzero(as_tuple=True)[0]
+        #     hardest_positive_index = hard_pos_indices[dist[i][hard_pos_indices].argmax()]
+        #     # dist_ap.append(dist[i][hardest_positive_index].unsqueeze(0))
+        #     hard_positive_images.append(inputs[hardest_positive_index].unsqueeze(0))
 
-        for i in range(n):
-            # Hardest positive
-            hard_pos_indices = mask[i].nonzero(as_tuple=True)[0]
-            hardest_positive_index = hard_pos_indices[dist[i][hard_pos_indices].argmax()]
-            # dist_ap.append(dist[i][hardest_positive_index].unsqueeze(0))
-            hard_positive_images.append(inputs[hardest_positive_index].unsqueeze(0))
+        #     # Hardest negative
+        #     hard_neg_indices = (mask[i] == 0).nonzero(as_tuple=True)[0]
+        #     hardest_negative_index = hard_neg_indices[dist[i][hard_neg_indices].argmin()]
+        #     # dist_an.append(dist[i][hardest_negative_index].unsqueeze(0))
+        #     hard_negative_images.append(inputs[hardest_negative_index].unsqueeze(0))
+        
+        hardest_positive_indices = torch.argmax(dist * mask, dim=1)
+        hardest_negative_indices = torch.argmin(dist * (~mask), dim=1)
 
-            # Hardest negative
-            hard_neg_indices = (mask[i] == 0).nonzero(as_tuple=True)[0]
-            hardest_negative_index = hard_neg_indices[dist[i][hard_neg_indices].argmin()]
-            # dist_an.append(dist[i][hardest_negative_index].unsqueeze(0))
-            hard_negative_images.append(inputs[hardest_negative_index].unsqueeze(0))
+        # Gather hardest positive and negative samples
+        hard_positive_images = inputs[hardest_positive_indices]
+        hard_negative_images = inputs[hardest_negative_indices]
 
-        h_pos_i = torch.stack(hard_positive_images).squeeze(1).view(b,w,h)
-        h_neg_i = torch.stack(hard_negative_images).squeeze(1).view(b,w,h)
+
+        h_pos_i = hard_positive_images.squeeze(1).view(b,w,h)
+        h_neg_i = hard_negative_images.squeeze(1).view(b,w,h)
         inputs = inputs.view(b,w,h)
-
-
-        # # dist_ap = torch.cat(dist_ap)
-        # # dist_an = torch.cat(dist_an)
-        # # Initialize lists to store modified positives and negatives
-        # modi_pos_list = []
-        # modi_neg_list = []
-
-        # # Iterate through the triplets and process them individually
-        # for anchor, hard_pos, hard_neg in zip(inputs, h_pos_i, h_neg_i):
-        #     modi_pos, modi_neg = self.dc_module(anchor, hard_pos, hard_neg)
-        #     modi_pos_list.append(modi_pos)
-        #     modi_neg_list.append(modi_neg)
-
-        # modi_pos_tensor = torch.stack(modi_pos_list)
-        # modi_neg_tensor = torch.stack(modi_neg_list)
         
         # Process all triplets in a batch through dc_module
         modi_pos_tensor, modi_neg_tensor = self.dc_module(inputs, h_pos_i, h_neg_i)

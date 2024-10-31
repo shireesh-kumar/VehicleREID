@@ -107,22 +107,6 @@ class DCModuleOptimized(nn.Module):
         return min_reconstructed_comparison, max_reconstructed_comparison
 
     
-# # Initialize the DCModule
-# dc_module = DCModuleOptimized(window_size=2, step_size=1)
-
-# # Create small test matrices (3x3)
-# anchor = torch.tensor([[3,5,2], [1,6,4], [7,9,8]], dtype=torch.float32)
-# positive = torch.tensor([[2 , 1,2], [ 1, 2,1], [2, 1,2]], dtype=torch.float32)
-
-# negative = torch.tensor([[3,2,1], [9,8,7], [5,4,6]], dtype=torch.float32)
-
-# # Pass through the DCModule
-# output_pos , output_neg = dc_module(anchor, positive,negative)                        
-
-# # Print the outputs
-# print("Output with Positive Comparison:\n", output_pos)
-# print("Output with Negative Comparison:\n", output_neg)
-# Initialize the DCModule
 
 # #Batch
 # dc_module = DCModuleOptimized(window_size=2, step_size=1)
