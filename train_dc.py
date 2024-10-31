@@ -28,6 +28,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"### Using device: {device} ###")
 num_gpus = torch.cuda.device_count()
 print(f"Number of GPUs available: {num_gpus}")
+best_val_loss = float('inf')
+best_model_path = 'dc_model_best.pth'
+
 
 trihard_loss = TripletLoss()
 
@@ -78,10 +81,10 @@ model = CustomResNet18(weights=weights).to(device)
 if torch.cuda.device_count() > 1:
     model = nn.DataParallel(model)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4,weight_decay=1e-4)
 
 # Training loop setup
-num_epochs = 1
+num_epochs = 20
 train_losses = []
 val_losses = []
 
@@ -90,7 +93,6 @@ val_losses = []
 # )
 
 print("## Initiating Training ... ##", flush=True)
-count = 0
 for epoch in range(num_epochs):
     model.train()
     total_train_loss = 0
@@ -111,14 +113,33 @@ for epoch in range(num_epochs):
         optimizer.step()                 # Update the parameters
 
         total_train_loss += triplet_loss.item()
-        print(f"Batch{count+1} completed for Epoch {epoch+1} ", flush=True)
-        count += 1
-
 
     avg_train_loss = total_train_loss / len(train_loader)
     train_losses.append(avg_train_loss)
     
-    print(f"## Epoch {epoch + 1}: Train Loss: {avg_train_loss} ##")
+    # Validation phase
+    model.eval()
+    total_val_loss = 0
+    with torch.no_grad():
+        for batch in val_loader:
+            images = batch[0].to(device)  # Move images to the device
+            labels = batch[1].to(device)  # Move labels to the device
+            
+            embeddings = model(images)  # Forward pass to get embeddings
+            triplet_loss = trihard_loss(embeddings, labels)  # Compute triplet loss
+            
+            total_val_loss += triplet_loss.item()
+
+    avg_val_loss = total_val_loss / len(val_loader)
+    val_losses.append(avg_val_loss)
+
+    # Print losses for this epoch
+    print(f"## Epoch {epoch + 1}: Train Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f} ##")
+    
+    # Save the best model based on validation loss
+    if avg_val_loss < best_val_loss:
+        best_val_loss = avg_val_loss
+        torch.save(model.state_dict(), best_model_path)
         
     # try:
     #     torch.cuda.memory._dump_snapshot(f"track.pickle")
@@ -127,6 +148,18 @@ for epoch in range(num_epochs):
 
     # # Stop recording memory snapshot history.
     # torch.cuda.memory._record_memory_history(enabled=None)
+    
+    
+# Plotting the training and validation loss
+plt.figure()
+plt.plot(range(1, num_epochs + 1), train_losses, label='Training Loss')
+plt.plot(range(1, num_epochs + 1), val_losses, label='Validation Loss')
+plt.title('DC Loss over Epochs')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.savefig('dc_loss_plot.png')  # Save loss plot as an image
+plt.close()
 
 
 # # Create a profile object

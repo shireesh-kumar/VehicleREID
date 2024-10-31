@@ -5,7 +5,6 @@ import torchvision.models as models
 
 
 from data_preprocessing import Load_Color_Train_Data, set_global_seed
-from resnet_model1 import ResNet
 import matplotlib.pyplot as plt
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
 import seaborn as sns
@@ -16,26 +15,29 @@ set_global_seed(42)
 # Load the data
 try:
     train_loader, val_loader, test_loader = Load_Color_Train_Data()
-    print("\n### Data loaded successfully ###")
+    print("\n### Data loaded successfully ###",flush=True)
 except:
-    print("\n### Error occured at loading the dataset ###")
+    print("\n### Error occured at loading the dataset ###",flush=True)
     
 # Initialize the model (ResNet50 for 9 classes)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"\n### Device {device} is used . ###")
+print(f"\n### Device {device} is used . ###",flush=True)
 
 model = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1)
 model.fc = nn.Linear(model.fc.in_features, 10) 
-model.to(device)
-
+if torch.cuda.device_count() > 1:
+    model = nn.DataParallel(model)
+model.to(device)  
+    
 # Define loss function and optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)  # weight decay for regularization
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.25, patience=5)
 
 # Training parameters
-num_epochs = 10
+num_epochs = 30
 best_val_accuracy = 0.0
-best_model_path = 'rgb_color_best_resnet34_type.pth'
+best_model_path = 'hsv_color_best_resnet34_type.pth'
 
 # Variables to store metrics for plotting
 train_losses, val_losses = [], []
@@ -90,6 +92,10 @@ for epoch in range(num_epochs):
     val_accuracy = 100 * correct_val / total_val
     val_losses.append(val_loss)
     val_accuracies.append(val_accuracy)
+    print(f"Learning rate before update: {scheduler.get_last_lr()}", flush=True)
+    scheduler.step(val_loss)
+    print(f"Learning rate after update: {scheduler.get_last_lr()}",flush=True)
+
 
     # Save the best model based on validation accuracy
     if val_accuracy > best_val_accuracy:
@@ -98,7 +104,7 @@ for epoch in range(num_epochs):
 
     print(f"Epoch [{epoch+1}/{num_epochs}], "
         f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.2f}%, "
-        f"Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.2f}%")
+        f"Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.2f}%",flush=True)
 
 # Testing using the best model
 model.load_state_dict(torch.load(best_model_path))
@@ -149,7 +155,7 @@ sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
 plt.title('Confusion Matrix')
 plt.xlabel('Predicted')
 plt.ylabel('Actual')
-plt.savefig('rgb_color_confusion_matrix.png')  # Save confusion matrix as an image
+plt.savefig('hsv_color_confusion_matrix.png')  # Save confusion matrix as an image
 plt.close()
 
 # Plot training & validation loss
@@ -160,7 +166,7 @@ plt.title('Loss over Epochs')
 plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.legend()
-plt.savefig('rgb_color_loss_plot.png')  # Save loss plot as an image
+plt.savefig('hsv_color_loss_plot.png')  # Save loss plot as an image
 plt.close()
 
 # Plot training & validation accuracy
@@ -171,6 +177,6 @@ plt.title('Accuracy over Epochs')
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy (%)')
 plt.legend()
-plt.savefig('rgb_color_accuracy_plot.png')  # Save accuracy plot as an image
+plt.savefig('hsv_color_accuracy_plot.png')  # Save accuracy plot as an image
 plt.close()
 
