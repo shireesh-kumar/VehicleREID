@@ -113,8 +113,10 @@ for epoch in range(num_epochs):
         total_train_loss += triplet_loss.item()
         print(f"Batch{count+1} completed for Epoch {epoch+1} ", flush=True)
         count += 1
-        break
-    break
+        
+    #     if(count == 2):
+    #         break
+    # break
         
 
     avg_train_loss = total_train_loss / len(train_loader)

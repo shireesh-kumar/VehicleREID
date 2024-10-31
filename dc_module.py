@@ -64,57 +64,47 @@ class DCModuleOptimized(nn.Module):
 
     def pool(self, anchor, comparison):
         
+        b, h, w = anchor.shape
+
         # Using unfold for patch-based extraction
-        anchor_patches = F.unfold(anchor.unsqueeze(0), kernel_size=self.window_size, stride=self.step_size).contiguous()
-        comparison_patches = F.unfold(comparison.unsqueeze(0), kernel_size=self.window_size, stride=self.step_size).contiguous()
+        anchor_patches = F.unfold(anchor.unsqueeze(1), kernel_size=self.window_size, stride=self.step_size).contiguous()
+        comparison_patches = F.unfold(comparison.unsqueeze(1), kernel_size=self.window_size, stride=self.step_size).contiguous()
 
         # Calculate absolute differences in patches
         diff = (anchor_patches - comparison_patches).abs()
-        _, min_indices = diff.view(-1, self.window_size * self.window_size).min(dim=1)
-        _, max_indices = diff.view(-1, self.window_size * self.window_size).max(dim=1)
-
+        _, min_indices = diff.view(b,-1, self.window_size * self.window_size).min(dim=2)
+        _, max_indices = diff.view(b,-1, self.window_size * self.window_size).max(dim=2)
 
         # Reshape comparison_patches for efficient indexing
-        min_comparison_patches_2d = comparison_patches.view(-1, self.window_size * self.window_size)
-        max_comparison_patches_2d = comparison_patches.view(-1, self.window_size * self.window_size).clone()
+        min_comparison_patches_2d = comparison_patches.view(b,-1, self.window_size * self.window_size)
+        max_comparison_patches_2d = comparison_patches.view(b,-1, self.window_size * self.window_size).clone()
 
-        # Directly create a tensor for min values
-        min_values_tensor = min_comparison_patches_2d[torch.arange(len(min_indices)), min_indices].view(-1, 1)
-        max_values_tensor = max_comparison_patches_2d[torch.arange(len(max_indices)), max_indices].view(-1, 1)
-
-        # Update min/max values in place
-        min_comparison_patches_2d[:] = min_values_tensor.expand(-1, min_comparison_patches_2d.size(1))
-        max_comparison_patches_2d[:] = max_values_tensor.expand(-1, max_comparison_patches_2d.size(1))
-
+        # Gather min and max values based on indices
+        min_values_tensor = min_comparison_patches_2d[torch.arange(b).unsqueeze(-1), torch.arange(min_indices.size(1)), min_indices]
+        max_values_tensor = max_comparison_patches_2d[torch.arange(b).unsqueeze(-1), torch.arange(max_indices.size(1)), max_indices]
+        
+        
+        # Prepare reconstructed tensors
+        min_reconstructed_comparison = torch.zeros((b, h, w), device=anchor.device)
+        max_reconstructed_comparison = torch.zeros((b, h, w), device=anchor.device)
 
         # Get original height and width
-        H, W = comparison.shape
-
-        # Create an empty tensor to hold the reconstructed image
-        min_reconstructed_comparison = torch.empty_like(comparison)
-        max_reconstructed_comparison = torch.empty_like(comparison)
-
-
-        # Create indices for the patches
-        num_patches_h = (H - self.window_size) // self.step_size + 1
-        num_patches_w = (W - self.window_size) // self.step_size + 1
+        num_patches_h = (h - self.window_size) // self.step_size + 1
+        num_patches_w = (w - self.window_size) // self.step_size + 1
 
         # Create a grid of all patch indices
         i_indices = torch.arange(num_patches_h) * self.step_size
         j_indices = torch.arange(num_patches_w) * self.step_size
         i_indices, j_indices = torch.meshgrid(i_indices, j_indices, indexing='ij')
-
-        # Calculate the patch indices directly
+        
+        # Place min and max patches back into the reconstructed images
         for idx in range(num_patches_h * num_patches_w):
             i = i_indices.flatten()[idx]
             j = j_indices.flatten()[idx]
-            min_reconstructed_comparison[i:i + self.window_size, j:j + self.window_size] = min_comparison_patches_2d[idx].view(self.window_size, self.window_size)
-            max_reconstructed_comparison[i:i + self.window_size, j:j + self.window_size] = max_comparison_patches_2d[idx].view(self.window_size, self.window_size)
+            min_reconstructed_comparison[:, i:i + self.window_size, j:j + self.window_size] = min_values_tensor[:, idx].unsqueeze(-1).unsqueeze(-1).expand(-1, self.window_size, self.window_size)
+            max_reconstructed_comparison[:, i:i + self.window_size, j:j + self.window_size] = max_values_tensor[:, idx].unsqueeze(-1).unsqueeze(-1).expand(-1, self.window_size, self.window_size)
 
-        min_reconstructed_comparison = min_reconstructed_comparison.squeeze(0)
-        max_reconstructed_comparison = max_reconstructed_comparison.squeeze(0)
-
-        return min_reconstructed_comparison,max_reconstructed_comparison
+        return min_reconstructed_comparison, max_reconstructed_comparison
 
     
 # # Initialize the DCModule
@@ -128,6 +118,28 @@ class DCModuleOptimized(nn.Module):
 
 # # Pass through the DCModule
 # output_pos , output_neg = dc_module(anchor, positive,negative)                        
+
+# # Print the outputs
+# print("Output with Positive Comparison:\n", output_pos)
+# print("Output with Negative Comparison:\n", output_neg)
+# Initialize the DCModule
+
+# #Batch
+# dc_module = DCModuleOptimized(window_size=2, step_size=1)
+
+# # Create small test matrices (3x3) and replicate them for batch testing
+# anchor = torch.tensor([[[3, 5, 2], [1, 6, 4], [7, 9, 8]],
+#                        [[3, 5, 2], [1, 6, 4], [7, 9, 8]]], dtype=torch.float32)
+
+# positive = torch.tensor([[[2, 1, 2], [1, 2, 1], [2, 1, 2]],
+#                         [[2, 1, 2], [1, 2, 1], [2, 1, 2]]], dtype=torch.float32)
+
+# negative = torch.tensor([[[3, 2, 1], [9, 8, 7], [5, 4, 6]],
+#                         [[3, 2, 1], [9, 8, 7], [5, 4, 6]]], dtype=torch.float32)
+
+
+# # # Pass through the DCModule
+# output_pos, output_neg = dc_module(anchor, positive, negative)
 
 # # Print the outputs
 # print("Output with Positive Comparison:\n", output_pos)

@@ -66,21 +66,24 @@ class TripletLoss(nn.Module):
         inputs = inputs.view(b,w,h)
 
 
-        # dist_ap = torch.cat(dist_ap)
-        # dist_an = torch.cat(dist_an)
-        # Initialize lists to store modified positives and negatives
-        modi_pos_list = []
-        modi_neg_list = []
+        # # dist_ap = torch.cat(dist_ap)
+        # # dist_an = torch.cat(dist_an)
+        # # Initialize lists to store modified positives and negatives
+        # modi_pos_list = []
+        # modi_neg_list = []
 
-        # Iterate through the triplets and process them individually
-        for anchor, hard_pos, hard_neg in zip(inputs, h_pos_i, h_neg_i):
-            modi_pos, modi_neg = self.dc_module(anchor, hard_pos, hard_neg)
-            modi_pos_list.append(modi_pos)
-            modi_neg_list.append(modi_neg)
+        # # Iterate through the triplets and process them individually
+        # for anchor, hard_pos, hard_neg in zip(inputs, h_pos_i, h_neg_i):
+        #     modi_pos, modi_neg = self.dc_module(anchor, hard_pos, hard_neg)
+        #     modi_pos_list.append(modi_pos)
+        #     modi_neg_list.append(modi_neg)
 
-        modi_pos_tensor = torch.stack(modi_pos_list)
-        modi_neg_tensor = torch.stack(modi_neg_list)
+        # modi_pos_tensor = torch.stack(modi_pos_list)
+        # modi_neg_tensor = torch.stack(modi_neg_list)
         
+        # Process all triplets in a batch through dc_module
+        modi_pos_tensor, modi_neg_tensor = self.dc_module(inputs, h_pos_i, h_neg_i)
+
 
         # Flatten the inputs, hard positives, and hard negatives for distance computation
         inputs_flat = inputs.view(inputs.size(0), -1)  # Shape: (batch_size, channels * w * h)
